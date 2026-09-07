@@ -1,8 +1,8 @@
-# fx-toys
+# fidgets
 
-一些小小的前端效果，每个一个文件夹，零依赖，打开 `index.html` 就能玩。
+一些能上手玩的前端小效果，每个一个文件夹，零依赖，打开 `index.html` 就能玩。
 
-Small front-end effects. One folder each, zero dependencies, open `index.html` to play.
+Small, fidgety front-end effects. One folder each, zero dependencies, open `index.html` to play.
 
 | 效果 | 说明 |
 |---|---|
