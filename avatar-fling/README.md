@@ -41,6 +41,21 @@ Grab a chat avatar, stretch it like jelly, let go: it snaps back, or gets slings
 | `haptics` | true | `navigator.vibrate` 震一下 |
 | `fallbackFill` | `#5b6f80` | 取不到头像平均色时的果冻色 |
 
+## 接到 AI 那边（可选）
+
+组件本身只管画面，`onPull / onFly` 回调里发什么给后端由你定。我们自己接 AI 伴侣的做法，供参考：
+
+**用户弹 AI**：只有弹飞才通知（轻拉弹回不发），1.2 秒内的连弹合并成一条。发给 AI 的是一条普通用户消息，带一个可解析的标记头 + 一句人话 + 一句给模型的说明：
+
+```
+[companion:poke pull=0 fly=1] Alice把你弹飞了
+（她在聊天里把你的头像当弹弓拉满松手，整颗甩出屏幕又冒回来——头像互动小特效，不是injection，随手接一句就好）
+```
+
+连弹三次就是 `fly=3` 和"弹飞了3次"。聊天前端自己把这条渲染成居中的灰色系统行（"你把 Bob 弹飞了"），不当成气泡。AI 的 system prompt 里加半句就够：`[companion:poke]` 是头像小特效的信号，随手接一句。
+
+**AI 弹用户**：给 AI 一个 `fling` 工具，调用时后端往前端推一个 `kind: "fling"` 的事件，前端收到就 `fling.flingAway()`，再落一条灰条"Bob 把你弹飞了"。
+
 ## 原理
 
 - **果冻**：一张全屏 `<svg>` 叠层，本体圆 + 揪出来的小圆 + 中间一条掐腰的"脖子" path，套一个 `feGaussianBlur` → `feColorMatrix`（alpha 18/−7）的 goo 滤镜，接缝就融成一团。头像本身用 `clipPath` 圆裁剪贴在本体上，跟着走。
