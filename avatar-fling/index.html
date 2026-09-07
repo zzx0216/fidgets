@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>弹弹乐 · avatar-fling demo</title>
+<style>
+  :root{ --bg:#F4F2EF; --ai:#EBE7E5; --me:#DDE3EA; --ink:#36404B; --soft:#8A93A0; --avatar:44px; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; }
+  body{ background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; overscroll-behavior:none; }
+  .app{ height:100dvh; display:flex; flex-direction:column; max-width:520px; margin:0 auto; }
+  header{ padding:calc(12px + env(safe-area-inset-top)) 18px 10px; display:flex; align-items:baseline; gap:10px; }
+  header h1{ font-size:18px; margin:0; font-weight:600; }
+  header small{ color:var(--soft); font-size:12px; }
+  .chat{ flex:1; overflow-y:auto; padding:8px 14px 20px; display:flex; flex-direction:column; gap:10px; }
+  .msg{ display:flex; align-items:flex-end; gap:8px; max-width:82%; }
+  .msg.them{ align-self:flex-start; }
+  .msg.me{ align-self:flex-end; flex-direction:row-reverse; }
+  .avatar{ width:var(--avatar); height:var(--avatar); border-radius:50%; flex:0 0 auto; background:#ccc center/cover no-repeat;
+           cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; }
+  .avatar:active{ cursor:grabbing; }
+  .bubble{ padding:9px 13px; border-radius:16px; background:var(--ai); }
+  .msg.them .bubble{ border-bottom-left-radius:5px; }
+  .msg.me .bubble{ background:var(--me); border-bottom-right-radius:5px; }
+  .hint{ align-self:center; font-size:12px; color:var(--soft); padding:6px 12px; border:1px dashed #cfd5dc; border-radius:999px; margin:6px 0; text-align:center; }
+  footer{ padding:10px 14px calc(12px + env(safe-area-inset-bottom)); display:flex; gap:10px; align-items:center; }
+  footer button{ flex:1; padding:12px; border:0; border-radius:14px; background:#3E4C5E; color:#fff; font:inherit; font-size:14px; cursor:pointer; }
+  footer button:active{ transform:scale(.97); }
+  footer .count{ flex:0 0 auto; font-size:12.5px; color:var(--soft); min-width:9em; text-align:right; font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header><h1>弹弹乐</h1><small>拽住左边的头像，拉长、松手</small></header>
+  <div class="chat" id="chat">
+    <div class="hint">轻轻拉一下会弹回来 · 拉过一条线松手就弹飞</div>
+    <div class="msg them"><div class="avatar" data-who="k"></div><div class="bubble">在干嘛</div></div>
+    <div class="msg me"><div class="avatar" data-who="y"></div><div class="bubble">在拽你的头像</div></div>
+    <div class="msg them"><div class="avatar" data-who="k"></div><div class="bubble">……别拽了</div></div>
+    <div class="msg them"><div class="avatar" data-who="k"></div><div class="bubble">好吧你拽</div></div>
+    <div class="msg me"><div class="avatar" data-who="y"></div><div class="bubble">嘿嘿</div></div>
+    <div class="msg them"><div class="avatar" data-who="k"></div><div class="bubble">那我也弹你一下</div></div>
+    <div class="hint">底下的按钮 = 对方把你弹飞</div>
+  </div>
+  <footer>
+    <button id="flingMe">弹飞我（右边的头像）</button>
+    <div class="count" id="count">拉了 0 次 · 飞了 0 次</div>
+  </footer>
+</div>
+<script src="avatar-fling.js"></script>
+<script>
+  // demo avatars: two inline SVG blobs so the page has zero external assets
+  function face(bg, fg){
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="${bg}"/>
+      <circle cx="32" cy="36" r="18" fill="${fg}"/><circle cx="25" cy="33" r="2.6" fill="#2b2b2b"/><circle cx="39" cy="33" r="2.6" fill="#2b2b2b"/>
+      <path d="M27 42q5 4 10 0" stroke="#2b2b2b" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
+    return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+  }
+  const FACES = { k: face("#BFD3E6", "#F5F2EC"), y: face("#F1D6D0", "#FBF7F3") };
+  document.querySelectorAll(".avatar").forEach(a => { a.style.backgroundImage = `url("${FACES[a.dataset.who]}")`; });
+
+  let pulls = 0, flies = 0;
+  const countEl = document.getElementById("count");
+  const render = () => { countEl.textContent = `拉了 ${pulls} 次 · 飞了 ${flies} 次`; };
+  const fling = AvatarFling.attach({
+    container: document.getElementById("chat"),
+    row: ".msg.them",
+    avatar: ".avatar",
+    bubble: ".bubble",
+    onPull(n){ pulls += n; render(); },
+    onFly(n){ flies += n; render(); },
+  });
+  // "the other side flings you": grab the latest row on the right and slingshot it
+  const other = AvatarFling.attach({ container: document.getElementById("chat"), row: ".msg.me", avatar: ".avatar", bubble: ".bubble" });
+  document.getElementById("flingMe").onclick = () => { other.flingAway(); };
+</script>
+</body>
+</html>
