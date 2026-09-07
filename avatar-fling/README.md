@@ -6,7 +6,7 @@
 
 Grab a chat avatar, stretch it like jelly, let go: it snaps back, or gets slingshotted off-screen with bouncy ball physics and pops back in place. Zero dependencies, touch + mouse.
 
-**Demo**：直接打开 `index.html`（手机上最好玩）。
+**Demo**：[zziying.github.io/fidgets/avatar-fling](https://zziying.github.io/fidgets/avatar-fling/)（手机上最好玩），或者直接打开 `index.html`。
 
 ## 用法
 
