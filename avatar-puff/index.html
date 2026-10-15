@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>河豚 · avatar-puff demo</title>
+<style>
+  :root{ --bg:#F4F2EF; --ai:#EBE7E5; --me:#DDE3EA; --ink:#36404B; --soft:#8A93A0; --avatar:40px; --ease:cubic-bezier(.22,1,.36,1); }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; }
+  body{ background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; overscroll-behavior:none; }
+  .app{ height:100dvh; display:flex; flex-direction:column; max-width:520px; margin:0 auto; }
+  header{ padding:calc(12px + env(safe-area-inset-top)) 18px 10px; display:flex; align-items:baseline; gap:10px; }
+  header h1{ font-size:18px; margin:0; font-weight:600; }
+  header small{ color:var(--soft); font-size:12px; }
+  .chat{ flex:1; overflow-y:auto; padding:8px 14px 20px; display:flex; flex-direction:column; }
+  .msg{ display:flex; align-items:flex-end; gap:8px; max-width:82%; margin-top:12px; transition:max-width var(--ap-ms, .45s) var(--ease); }
+  .msg.grouped{ margin-top:4px; }
+  .msg.them{ align-self:flex-start; }
+  .msg.me{ align-self:flex-end; flex-direction:row-reverse; }
+  .avatar{ width:var(--avatar); height:var(--avatar); border-radius:50%; flex:0 0 auto; background:#ccc center/cover no-repeat;
+           touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+           transition:width var(--ap-ms, .45s) var(--ease), height var(--ap-ms, .45s) var(--ease), margin var(--ap-ms, .45s) var(--ease), scale var(--ap-ms, .45s) var(--ease); }
+  .msg:not(.tail) .avatar{ visibility:hidden; }   /* only the last row of a group shows its avatar; the others keep the column */
+  .bubble{ padding:9px 13px; border-radius:16px; background:var(--ai); -webkit-user-select:none; user-select:none; }
+  .msg.them.tail .bubble{ border-bottom-left-radius:5px; }
+  .msg.me .bubble{ background:var(--me); }
+  .msg.me.tail .bubble{ border-bottom-right-radius:5px; }
+  .sys{ align-self:center; font-size:12px; color:var(--soft); margin:14px 0 2px; }
+  .hint{ align-self:center; font-size:12px; color:var(--soft); padding:6px 12px; border:1px dashed #cfd5dc; border-radius:999px; margin:6px 0; text-align:center; }
+
+  /* ── recipe A「让位」: the whole column widens, the head grows upward without growing the row,
+        rows on the other side give that column back ── */
+  .chat.room .msg.me.ap-me .avatar{ width:calc(var(--avatar) * var(--ap-me, 1)); height:calc(var(--avatar) * var(--ap-me, 1)); margin-top:calc(var(--avatar) * (1 - var(--ap-me, 1))); }
+  .chat.room .msg.them.ap-me{ max-width:calc(82% - var(--avatar) * (var(--ap-me, 1) - 1)); }
+  .chat.room .msg.them.ap-them .avatar{ width:calc(var(--avatar) * var(--ap-them, 1)); height:calc(var(--avatar) * var(--ap-them, 1)); margin-top:calc(var(--avatar) * (1 - var(--ap-them, 1))); }
+  .chat.room .msg.me.ap-them{ max-width:calc(82% - var(--avatar) * (var(--ap-them, 1) - 1)); }
+  /* ── recipe B「覆盖」: just scale it, zero layout impact (may cover a bubble) ── */
+  .chat.overlay .msg.me.ap-me .avatar{ scale:var(--ap-me, 1); transform-origin:100% 100%; }
+  .chat.overlay .msg.them.ap-them .avatar{ scale:var(--ap-them, 1); transform-origin:0 100%; }
+  .chat.overlay .msg.tail .avatar{ position:relative; z-index:1; }
+
+  footer{ padding:8px 14px calc(12px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:8px; }
+  .bar{ display:flex; gap:8px; }
+  .bar button{ flex:1; padding:10px 6px; border:0; border-radius:12px; background:#3E4C5E; color:#fff; font:inherit; font-size:13px; cursor:pointer; white-space:nowrap; }
+  .bar button.ghost{ background:rgba(62,76,94,.1); color:var(--ink); }
+  .bar button:active{ transform:scale(.97); }
+  .field{ display:flex; gap:8px; }
+  .field input{ flex:1; min-width:0; border:0; border-radius:12px; padding:10px 12px; font:inherit; background:#fff; color:var(--ink); outline:none; }
+  .field button{ border:0; border-radius:12px; padding:0 16px; background:#3E4C5E; color:#fff; font:inherit; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header><h1>河豚</h1><small>长按右边你自己的头像</small></header>
+  <div class="chat room" id="chat">
+    <div class="hint">长按 0.4 秒鼓起来 · 鼓着再长按，撒气瘪回去</div>
+  </div>
+  <footer>
+    <div class="bar">
+      <button id="reply" class="ghost">对方回一句</button>
+      <button id="theirPuff" class="ghost">对方鼓</button>
+      <button id="layout" class="ghost">布局：让位</button>
+    </div>
+    <div class="field"><input id="inp" placeholder="说点什么…" autocomplete="off"><button id="send">发送</button></div>
+  </footer>
+</div>
+<script src="avatar-puff.js"></script>
+<script>
+  // demo avatars: two inline SVG faces so the page has zero external assets
+  function face(bg, fg){
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="${bg}"/>
+      <circle cx="32" cy="36" r="18" fill="${fg}"/><circle cx="25" cy="33" r="2.6" fill="#2b2b2b"/><circle cx="39" cy="33" r="2.6" fill="#2b2b2b"/>
+      <path d="M27 42q5 4 10 0" stroke="#2b2b2b" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
+    return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+  }
+  const FACES = { them: face("#BFD3E6", "#F5F2EC"), me: face("#F1D6D0", "#FBF7F3") };
+  const chat = document.getElementById("chat");
+
+  function add(side, text){
+    const last = chat.lastElementChild;
+    const grouped = last && last.classList.contains("msg") && last.classList.contains(side);
+    if (grouped) last.classList.remove("tail");
+    const row = document.createElement("div");
+    row.className = `msg ${side} tail${grouped ? " grouped" : ""}`;
+    row.innerHTML = `<div class="avatar"></div><div class="bubble"></div>`;
+    row.querySelector(".avatar").style.backgroundImage = `url("${FACES[side]}")`;
+    row.querySelector(".bubble").textContent = text;
+    chat.appendChild(row);
+    chat.scrollTop = chat.scrollHeight;
+  }
+  function sys(text){
+    const d = document.createElement("div"); d.className = "sys"; d.textContent = "✦ " + text + " ✦";
+    chat.appendChild(d); chat.scrollTop = chat.scrollHeight;
+  }
+  [["them", "晚上好，今天怎么样"], ["me", "还行吧"], ["me", "你今天都没主动找我"], ["them", "我在等你忙完呀"]].forEach(([s, t]) => add(s, t));
+
+  const mine = AvatarPuff.attach({
+    container: chat, side: "me", row: ".msg.me", anyRow: ".msg", avatar: ".avatar",
+    onChange(on){ sys(on ? "你的头像鼓起来了" : "你的头像瘪回去了"); },
+  });
+  const theirs = AvatarPuff.attach({
+    container: chat, side: "them", row: ".msg.them", anyRow: ".msg", avatar: ".avatar", gesture: false,
+    onChange(on){ sys(on ? "对方的头像鼓起来了" : "对方的头像瘪回去了"); document.getElementById("theirPuff").textContent = on ? "对方瘪" : "对方鼓"; },
+  });
+
+  const LINES = ["嗯？", "我在呢，你说", "……你先别鼓，听我说", "我错了我错了", "好好好，抱一下"];
+  let li = 0;
+  document.getElementById("reply").onclick = () => add("them", LINES[li++ % LINES.length]);
+  document.getElementById("theirPuff").onclick = () => theirs.toggle();
+  document.getElementById("layout").onclick = (e) => {
+    const room = chat.classList.toggle("room"); chat.classList.toggle("overlay", !room);
+    e.target.textContent = room ? "布局：让位" : "布局：覆盖";
+  };
+  const inp = document.getElementById("inp");
+  const send = () => { const t = inp.value.trim(); if (!t) return; inp.value = ""; add("me", t); };
+  document.getElementById("send").onclick = send;
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+</script>
+</body>
+</html>

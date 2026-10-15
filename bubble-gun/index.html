@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>哒哒哒 · bubble-gun demo</title>
+<style>
+  :root{ --bg:#F4F2EF; --ai:#EBE7E5; --me:#DDE3EA; --ink:#36404B; --soft:#8A93A0; --avatar:44px; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; }
+  body{ background:var(--bg); color:var(--ink); font:15px/1.6 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; overscroll-behavior:none; -webkit-user-select:none; user-select:none; }
+  .app{ height:100dvh; display:flex; flex-direction:column; max-width:520px; margin:0 auto; }
+  header{ padding:calc(12px + env(safe-area-inset-top)) 18px 10px; display:flex; align-items:baseline; gap:10px; }
+  header h1{ font-size:18px; margin:0; font-weight:600; }
+  header small{ color:var(--soft); font-size:12px; }
+  .chat{ flex:1; overflow-y:auto; padding:8px 14px 20px; display:flex; flex-direction:column; gap:10px; }
+  .msg{ display:flex; align-items:flex-end; gap:8px; max-width:82%; }
+  .msg.them{ align-self:flex-start; }
+  .msg.me{ align-self:flex-end; flex-direction:row-reverse; }
+  .avatar{ width:var(--avatar); height:var(--avatar); border-radius:50%; flex:0 0 auto; background:#ccc center/cover no-repeat; }
+  .bubble{ padding:9px 13px; border-radius:16px; background:var(--ai); cursor:pointer; }
+  .bubble b{ font-weight:600; }
+  .msg.them .bubble{ border-bottom-left-radius:5px; }
+  .msg.me .bubble{ background:var(--me); border-bottom-right-radius:5px; }
+  .hint{ align-self:center; font-size:12px; color:var(--soft); padding:6px 12px; border:1px dashed #cfd5dc; border-radius:999px; margin:6px 0; text-align:center; }
+  footer{ padding:10px 14px calc(12px + env(safe-area-inset-bottom)); display:flex; gap:10px; align-items:center; }
+  footer button{ flex:1; padding:12px; border:0; border-radius:14px; background:#3E4C5E; color:#fff; font:inherit; font-size:14px; cursor:pointer; }
+  footer button:active{ transform:scale(.97); }
+  footer .count{ flex:0 0 auto; font-size:12.5px; color:var(--soft); min-width:7em; text-align:right; font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header><h1>哒哒哒</h1><small>点左边对方的气泡</small></header>
+  <div class="chat" id="chat">
+    <div class="hint">点对方的气泡 = 整句拆成字射他 · 地上的字可以拖</div>
+    <div class="msg them"><div class="avatar" data-who="them"></div><div class="bubble">今天晚饭吃了吗</div></div>
+    <div class="msg me"><div class="avatar" data-who="me"></div><div class="bubble">还没，在写代码</div></div>
+    <div class="msg them"><div class="avatar" data-who="them"></div><div class="bubble">又不吃饭。说了多少次了，<b>先吃饭</b>，代码又不会跑掉</div></div>
+    <div class="msg me"><div class="avatar" data-who="me"></div><div class="bubble">我又丑又穷什么都没有，只有一堆没写完的代码</div></div>
+    <div class="msg them"><div class="avatar" data-who="them"></div><div class="bubble">你这样说我就要生气了。我数到三，一，二，二点五，二点七五……算了，先抱一下再说</div></div>
+    <div class="hint">点你自己的气泡 = 对方射你</div>
+  </div>
+  <footer>
+    <button id="again">再来一梭子</button>
+    <div class="count" id="count">射了 0 个字</div>
+  </footer>
+</div>
+<!-- optional: real physics for the letters on the floor. Without it they just bounce off and fade. -->
+<script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
+<script src="bubble-gun.js"></script>
+<script>
+  // demo avatars: two inline SVG faces so the page has no image assets
+  function face(bg, fg){
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="${bg}"/>
+      <circle cx="32" cy="36" r="18" fill="${fg}"/><circle cx="25" cy="33" r="2.6" fill="#2b2b2b"/><circle cx="39" cy="33" r="2.6" fill="#2b2b2b"/>
+      <path d="M27 42q5 4 10 0" stroke="#2b2b2b" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
+    return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+  }
+  const FACES = { them: face("#BFD3E6", "#F5F2EC"), me: face("#F1D6D0", "#FBF7F3") };
+  document.querySelectorAll(".avatar").forEach(a => { a.style.backgroundImage = `url("${FACES[a.dataset.who]}")`; });
+
+  const chat = document.getElementById("chat");
+  BubbleGun.tune.floor = chat;   // letters pile up on the chat's bottom edge
+  // shoot at the newest avatar on the other side
+  const newestAvatar = (side) => { const all = chat.querySelectorAll(`.msg.${side} .avatar`); return all[all.length - 1]; };
+
+  let shots = 0, last = null;
+  const countEl = document.getElementById("count");
+  function shoot(bubble){
+    const side = bubble.closest(".msg").classList.contains("them") ? "them" : "me";
+    last = bubble;
+    BubbleGun.fire(bubble, newestAvatar(side)).then((played) => {
+      if (!played) return;
+      shots += bubble.textContent.replace(/\s/g, "").length;
+      countEl.textContent = `射了 ${shots} 个字`;
+    });
+  }
+  chat.addEventListener("click", (e) => { const b = e.target.closest(".bubble"); if (b) shoot(b); });
+  document.getElementById("again").onclick = () => shoot(last || chat.querySelectorAll(".msg.them .bubble")[2]);
+</script>
+</body>
+</html>
